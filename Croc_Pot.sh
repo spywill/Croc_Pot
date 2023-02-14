@@ -4,7 +4,7 @@
 # Description:   Send E-mail, Status of keycroc, Basic Nmap, TCPdump, Install payload,
 #                SSH to HAK5 gear, Reverse ssh tunnel, and more
 # Author:        Spywill
-# Version:       1.8.6
+# Version:       1.8.7
 # Category:      Key Croc
 
 ##
@@ -289,47 +289,84 @@ function croc_passwd_check() {
 }
 croc_passwd_check
 ##
-#----Stop/start ICMP alert by pressing [kp] in Croc_Pot Main Menu
+#----Stop/start ICMP/PORT alert by pressing [kp] in Croc_Pot Main Menu
 ##
 function start_icmp() {
-	Info_Screen '-ICMP alert will run in background
--Alert will appear in terminal inbound ICMP
--Press [kp] in Main Menu to stop/start ICMP alert
+	Info_Screen '-ICMP/PORT alert will run in background
+-Alert will appear in terminal inbound ICMP/PORT
+-Press [kp] in Main Menu to stop/start ICMP/PORT alert
 -Press [b] in any menu to return to previous menu
 -Press [p] in any menu Panic button close application, kill wlan0
 -Press [st] in Main Menu or Plus_Menu to refresh title every five sec'
-	if ps -p "$(sed -n 1p /tmp/icmp_pid.txt)"; then
-		ColorYellow 'Killing icmp alert\n'
-		kill -9 "$(sed -n 1p /tmp/icmp_pid.txt)"
+	if ps -p "$(sed -n 1p /tmp/port_pid.txt)" || ps -p "$(sed -n 1p /tmp/icmp_pid.txt)"; then
+		if ps -p "$(sed -n 1p /tmp/port_pid.txt)"; then
+			ColorYellow "Killing port alert\n"
+			kill -9 "$(sed -n 1p /tmp/port_pid.txt)"
+		fi
+		if ps -p "$(sed -n 1p /tmp/icmp_pid.txt)"; then
+			ColorYellow "Killing icmp alert\n"
+			kill -9 "$(sed -n 1p /tmp/icmp_pid.txt)"
+			ICMP_STATUS="$red"
+		fi
 		killall -9 tcpdump
-		ICMP_STATUS="$red" ; sleep 1
+		sleep 1
 	else
 ##
 #----tcpdump, alert the keycroc of inbound ICMP and temporarily disabled inbound ICMP for 1 min
 #----Get current network range [ wlan0 interface ]
 ##
 	icmp_alert() {
-		local ip_address=$(ifconfig wlan0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
-		local network_mask=$(ifconfig wlan0 | grep -Eo 'Mask:([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
-		local network_range=""
-		IFS='.' read -ra ip_octets <<< "$ip_address"
-		IFS='.' read -ra mask_octets <<< "$network_mask"
-		for i in {0..3}; do
-			network_range+="$((ip_octets[i] & mask_octets[i]))."
-		done
-		local network_range="${network_range%?}/24"
+		ip_address=$(ifconfig wlan0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+		netmask=$(ifconfig wlan0 | grep -Eo 'Mask:([0-9]*\.){3}[0-9]*|netmask ([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+		IFS=. read -r i1 i2 i3 i4 <<< "$ip_address"
+		IFS=. read -r m1 m2 m3 m4 <<< "$netmask"
+		network_range="$((i1 & m1)).$((i2 & m2)).$((i3 & m3)).0/24"
 		sleep 1
-		until (tcpdump -c 1 -n '((icmp and icmp[0]=8) or (udp and src net '$network_range' and (dst port 33434 or dst port 33534))) and not src host '$(ifconfig wlan0 | grep "inet addr" | awk '{print $2}' | cut -c 6-)'' | grep -o "IP.*" | sed 's/id.*//g; s/length.*//g' | sed 's/IP/\n&/g'); do
+		until (tcpdump -c 1 -n '((icmp and icmp[0]=8) or (udp and src net '$network_range' and (dst port 33434 or dst port 33534))) and not src host '$ip_address'' | grep -o "IP.*" | sed 's/id.*//g; s/length.*//g' | sed 's/IP/\n&/g'); do
 			:
 		done
 		LED C FAST
+		iptables-save > ~/firewall-rules-backup.txt
+		iptables -F
 		iptables -A OUTPUT -p icmp --icmp-type any -j DROP
 		Countdown 1 15 Alert inbound ICMP temporarily disabling inbound ICMP
-		iptables -F
+		iptables-restore < ~/firewall-rules-backup.txt
 		ColorYellow "INBOUND ICMP IS ENABLED\033[0K\r" ; sleep 4 ; tput el
 		printf '\033[1A\033[K'
 		LED OFF
 		icmp_alert & echo -ne $! > /tmp/icmp_pid.txt
+	}
+##
+#----tcpdump, alert the keycroc of port scan and temporarily disabled all open ports for 1 min
+##
+	port_alert() {
+		ip_address=$(ifconfig wlan0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+		file=/tmp/tcpdump.out
+		until (tcpdump -i wlan0 -c 20 'tcp[tcpflags] & (tcp-syn) != 0 and not src host '$ip_address'' -w $file -G 10); do
+			:
+		done
+		LED C FAST
+		printf '\033[H\033[2J'
+		ColorRed "Port scan has been detected\n"
+		while read -r ip; do
+			count=$(tcpdump -nn -r $file | grep -c "$ip")
+			port=$(tcpdump -nn -r $file | grep "$ip" | awk '{print $5}' | awk -F. '{print $5}')
+			ColorYellow "ip: $(ColorCyan "$ip")\n"
+			ColorYellow "count: $(ColorCyan "$count")\n"
+			ColorYellow "port: $(ColorCyan "$port")\n"
+		done <<< "$(tcpdump -nn -r $file | awk '{print $3}' | awk -F. '{print $1"."$2"."$3"."$4}' | sort -u)" 2>/dev/null
+		ColorRed "Temporarily closing all open ports for one minute...\n"
+		iptables-save > ~/firewall-rules-backup.txt
+		iptables -F
+		iptables -P INPUT DROP
+		iptables -P OUTPUT DROP
+		iptables -P FORWARD DROP
+		sleep 60
+		iptables-restore < ~/firewall-rules-backup.txt
+		printf '\033[H\033[2J'
+		LED OFF
+		ColorGreen "All open ports are now restored.\n" ; sleep 1
+		port_alert & echo -ne $! > /tmp/port_pid.txt
 	}
 		read_all 'START ICMP ALERT Y/N AND PRESS [ENTER]'
 		case "$r_a" in
@@ -346,9 +383,34 @@ function start_icmp() {
 				P_A="${yellow}ICMP ALERT: ${clear}${red}NOT RUNNING"
 				invalid_entry ;;
 		esac
+		read_all 'START PORT ALERT Y/N AND PRESS [ENTER]'
+		case "$r_a" in
+			[yY] | [yY][eE][sS])
+				ColorYellow 'STARTING PORT ALERT\n'
+				port_alert & echo -ne $! > /tmp/port_pid.txt ;;
+			[nN] | [nN][oO])
+				ColorYellow 'PORT ALERT NOT RUNNING\n' ;;
+			*)
+				invalid_entry ;;
+		esac
 	fi
 } 2>/dev/null
 start_icmp
+##
+#----Check current SSID and signal strength
+##
+SSID_CHECK() {
+	output=$(iw dev wlan0 link)
+	if [ -z "$output" ]; then
+		ColorRed "Error: Not connected to any Wi-Fi network\n"
+	fi
+	ssid=$(echo "$output" | grep "SSID" | awk '{print $2}')
+	info=$(iw dev wlan0 scan | grep -E "signal:|SSID:" | sed -e "s/\tsignal: //" -e "s/\tSSID: //" | awk '{ORS = (NR % 2 == 0)? "\n" : " "; print}' | grep -E $ssid)
+	signal_strength=$(echo "$info" | awk '{print $1}')
+	ColorYellow "Current SSID: $(ColorGreen "$ssid")\n"
+	ColorYellow "Signal Strength: $(ColorGreen "$signal_strength dBm")\n"
+}
+SSID_CHECK ; echo -ne "\n"
 ##
 #----Check /tmp/cc-client-error.log count number or errors
 ##
@@ -373,7 +435,7 @@ fi
 function keyboard_check() {
 	[ "$(KEYBOARD)" = PRESENT ] && ColorYellow "KEYBOARD: $(ColorGreen "PRESENT $(ColorCyan "$(cat /tmp/mode)")")\n" || ColorYellow "KEYBOARD: $(ColorRed 'MISSING')\n"
 }
-keyboard_check
+keyboard_check ; echo -ne "\n"
 ##
 #----Croc_Pot file count
 ##
@@ -480,7 +542,7 @@ internet_test
 ##
 	while : ; do
 		ColorGreen "`tput cup 0 0`$clear\e[41;38;5;232;1m$LINE$clear
-$(ColorGreen '»»»»»»»»»»»» CROC_POT ««««««««')$(ColorYellow 'VER:1.8.6')\e[41;38;5;232m${array[1]}$clear$(ColorYellow " $(hostname | awk '{ print toupper($0); }') IP: $(awk -v m=20 '{printf("%-20s\n", $0)}' <<< "$(ifconfig wlan0 | grep "inet addr" | awk '{print $2}' | cut -c 6-)")")$(awk -v m=19 '{printf("%-19s\n", $0)}' <<< "$I_T")$clear
+$(ColorGreen '»»»»»»»»»»»» CROC_POT ««««««««')$(ColorYellow 'VER:1.8.7')\e[41;38;5;232m${array[1]}$clear$(ColorYellow " $(hostname | awk '{ print toupper($0); }') IP: $(awk -v m=20 '{printf("%-20s\n", $0)}' <<< "$(ifconfig wlan0 | grep "inet addr" | awk '{print $2}' | cut -c 6-)")")$(awk -v m=19 '{printf("%-19s\n", $0)}' <<< "$I_T")$clear
 $(ColorBlue "AUTHOR: $(ColorYellow 'SPYWILL')")$(ColorCyan "   $(awk -v m=21 '{printf("%-21s\n", $0)}' <<< "$(uptime -p | sed 's/up/CROC UP:/g' | sed 's/hours/hr/g' | sed 's/hour/hr/g' | sed 's/,//g' | sed 's/minutes/min/g' | sed 's/minute/min/g')")")\e[41;38;5;232m§$clear$(ColorYellow " $(hostname | awk '{ print toupper($0); }') VER: $(cat /root/udisk/version.txt) ")$ICMP_STATUS*$clear$(ColorYellow "TARGET-PC:$(ColorGreen "$(awk -v m=10 '{printf("%-10s\n", $0)}' <<< "$(OS_CHECK)")")")
 $(ColorBlue "$(awk -v m=17 '{printf("%-17s\n", $0)}' <<< "${croc_timezone^^}")")$(ColorCyan " $(date +%b-%d-%y-%r | awk '{ print toupper($0); }')")\e[41;38;5;232mΩ$clear$(ColorYellow ' KEYBOARD:')$(ColorGreen "$(sed -n 9p /root/udisk/config.txt | sed 's/DUCKY_LANG //g' | sed -e 's/\(.*\)/\U\1/') ")$(ColorYellow "ID:$(ColorGreen "${k_b^^}")")
 $(ColorGreen '»»»»»»»»»»»» ')$(ColorRed 'KEYCROC-HAK')\e[40m${array[0]}$clear$(ColorGreen ' «««««««««««««')\e[41;38;5;232m${array[2]}$clear$(ColorYellow " TEMP:$(ColorCyan "$(cat /sys/class/thermal/thermal_zone0/temp)°C")")$(ColorYellow " USAGE:$(ColorCyan "$(awk -v m=6 '{printf("%-6s\n", $0)}' <<< "$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}')")")")$(ColorYellow "MEM:$(ColorCyan "$(awk -v m=13 '{printf("%-13s\n", $0)}' <<< "$(free -m | awk 'NR==2{printf "%.2f%%", $3/$2*100 }')")")")
@@ -552,7 +614,7 @@ function displaySpinner() {
 		local spinstr=$temp${spinstr%"$temp"}
 		sleep 0.3
 	done
-	ColorYellow "\rProgress has finished$clear\033[0K\r\n"
+	ColorYellow "\r\033[2KProgress has finished\r\n"
 }
 ##
 #----Panic button press [P] in any menu will close all application and open login screen
@@ -872,7 +934,7 @@ fi
 		*)
 			invalid_entry ; mail_file ;;
 	esac
-python_email & displaySpinner Please wait... && echo -ne "\n\n"
+python_email & displaySpinner Please wait...
 ##
 #----Mail send e-mail alert when keyboard is activated
 ##
@@ -5361,6 +5423,7 @@ AROUND TO DIFFERENT WIFI ACCESS POINTS CREATE A PAYLOAD WITH
 MATCH WORD AND CONNECT TO WIFI ACCESS POINT QUICKLY
 
 Thanks to dark_pyrro payload [ Key-Croc-AP_STA ]'
+	SSID_CHECK
 	read_all '[I]-INSTALL [T]-TERMINAL [N]-NONE AND PRESS [ENTER]'
 	case "$r_a" in
 		[Ii])
@@ -6026,7 +6089,7 @@ elif [[ \"\$LOOT\" == \"defenderdisable\" ]]; then\n	LED R\n	Q GUI i\n	sleep 3\n
 	MenuTitle 'WINDOWS DEFENDER'
 	MenuColor 25 1 'ENABLE WINDOWS DEFENDER'
 	MenuColor 25 2 'DISABLE WINDOWS DEFENDER'
-	MenuColor 25 3 'CROC_DEFENDER PAYLOAD'
+	MenuColor 25 3 'CROC DEFENDER PAYLOAD'
 	MenuColor 25 4 'RETURN TO MAIN MENU'
 	MenuEnd 23
 	case "$m_a" in
@@ -6471,15 +6534,15 @@ Q CONTROL-SHIFT-LEFTARROW\nQ BACKSPACE\nQ ALT-F4\nQ ALT-F4\nATTACKMODE OFF\nWAIT
 #----Install Payloads Menu
 ##
 MenuTitle 'INSTALL PAYLOADS MENU'
-MenuColor 22 1 'GETONLINE PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 10 'CROC_FORCE PAYLOAD' | sed 's/\t//g'
-MenuColor 22 2 'CROC_UNLOCK PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 11 'CROC_LOCKOUT PAYLOAD' | sed 's/\t//g'
+MenuColor 22 1 'CROC GETONLINE PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 10 'CROC FORCE PAYLOAD' | sed 's/\t//g'
+MenuColor 22 2 'CROC UNLOCK PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 11 'CROC LOCKOUT PAYLOAD' | sed 's/\t//g'
 MenuColor 22 3 'WIFI SETUP PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 12 'WINDOWS DEFENDER' | sed 's/\t//g'
-MenuColor 22 4 'QUICK START CROC_POT' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 13 'CROC_CLOSE_IT PAYLOAD' | sed 's/\t//g'
-MenuColor 22 5 'CROC_SHOT PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 14 'DOUBLE_UP PAYLOAD' | sed 's/\t//g'
-MenuColor 22 6 'CROC_BITE PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 15 'QUACK_ATTACK PAYLOAD' | sed 's/\t//g'
-MenuColor 22 7 'CROC_REDIRECT PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 16 'KEYBOARD_KILLER' | sed 's/\t//g'
+MenuColor 22 4 'QUICK START CROC_POT' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 13 'CROC CLOSE_IT PAYLOAD' | sed 's/\t//g'
+MenuColor 22 5 'CROC SHOT PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 14 'DOUBLE UP PAYLOAD' | sed 's/\t//g'
+MenuColor 22 6 'CROC BITE PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 15 'QUACK_ATTACK PAYLOAD' | sed 's/\t//g'
+MenuColor 22 7 'CROC REDIRECT PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 16 'KEYBOARD KILLER' | sed 's/\t//g'
 MenuColor 22 8 'NO SLEEPING PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 17 'KEYCROC ATTACKMODE' | sed 's/\t//g'
-MenuColor 22 9 'CROC_REPLACE PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 18 'DELETE CHAR PAYLOAD' | sed 's/\t//g'
+MenuColor 22 9 'CROC REPLACE PAYLOAD' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 18 'DELETE CHAR PAYLOAD' | sed 's/\t//g'
 MenuColor 22 19 'KEYSTROKES LAPTOP' ; MenuColor 22 20 'RESTRICTED WORDS' ; MenuColor 22 21 'RETURN TO MAIN MENU'
 MenuEnd 22
 	case "$m_a" in
@@ -7111,17 +7174,105 @@ esac
 	esac
 }
 ##
+#----https://chat.openai.com/
+##
+chat_openai() {
+	install_package jq JQ
+	Info_Screen '-Run ChatGPT on keycroc https://chat.openai.com
+-This code was created by ChatGPT
+
+This is a simple shell script that creates a chatbot using the OpenAI GPT-3 API.
+Script starts by printing a greeting message
+ChatGPT: Hello! How can I help you today?
+and then enters into a loop that waits for user input.
+When the user inputs a message, the script creates a prompt by prefixing
+the user input with "ChatGPT:".
+The prompt is then used as the input for the OpenAI API request.
+API request is made using curl and the response is captured in a shell variable.
+The response from the API is then processed with jq,
+a command line tool for processing JSON, to extract the text generated by GPT-3.
+This text is then printed as the chatbot response.
+The loop continues to wait for user input until the user types bye,
+at which point the script breaks out of the loop and prints
+ChatGPT: Bye! Have a great day!
+
+-Requirements: jq and your ChatGPT API keys'
+	read_all 'START ChatGPT Y/N AND PRESS [ENTER]'
+	case "$r_a" in
+		[yY] | [yY][eE][sS])
+			validate_api_key() {
+				api_key=$(sed -n 1p /root/udisk/tools/Croc_Pot/ChatGPT_API.txt)
+				if [ -z "$api_key" ]; then
+					ColorRed "Error: API key is not set.\n"
+					rm /root/udisk/tools/Croc_Pot/ChatGPT_API.txt
+					user_input_passwd /root/udisk/tools/Croc_Pot/ChatGPT_API.txt API_KEYS
+					api_key=$(sed -n 1p /root/udisk/tools/Croc_Pot/ChatGPT_API.txt)
+				fi
+			} 2>/dev/null
+			validate_api_key
+			temperature=0.5
+			max_tokens=1024
+			ColorYellow "ChatGPT: $(ColorCyan "Hello! How can I help you today ?")\n"
+			while true; do
+				ColorYellow "You: " ; IFS= read -r user_input
+				case "$user_input" in
+					"bye")
+						ColorYellow "ChatGPT: $(ColorCyan "Bye! Have a great day!")"
+						break ;;
+					"temperature"*)
+						temperature=$(echo $user_input | awk '{print $2}')
+						ColorYellow "ChatGPT: $(ColorCyan "Temperature set to $temperature.")\n"
+						continue ;;
+					"max tokens"*)
+						max_tokens=$(echo $user_input | awk '{print $3}')
+						ColorYellow "ChatGPT: $(ColorCyan "Maximum number of tokens set to $max_tokens.")\n"
+						continue ;;
+					*)
+						prompt="ChatGPT: $user_input" ;;
+				esac
+				response=$(curl -s -k -X POST "https://api.openai.com/v1/engines/text-davinci-002/completions" \
+				-H "Content-Type: application/json" \
+				-H "Authorization: Bearer $api_key" \
+				-d "{
+				\"prompt\": \"$prompt\",
+				\"max_tokens\": $max_tokens,
+				\"n\": 1,
+				\"temperature\": $temperature
+				}")
+				if [ $? -ne 0 ]; then
+					ColorRed "Error: Request failed\n"
+					continue
+				fi
+				if [ "$response" = "null" ] || [ -z "$response" ]; then
+					ColorRed "Error: API response is invalid.\n"
+					continue
+				fi
+				answer=$(echo $response | jq -r '.choices[0].text')
+				if [ "$answer" = "null" ] || [ -z "$answer" ]; then
+					ColorRed "Error: API response does not contain a valid answer.\n"
+					continue
+				fi
+				ColorYellow "ChatGPT: $(ColorCyan "$answer")\n"
+			done ;;
+		[nN] | [nN][oO])
+			ColorYellow 'Maybe next time\n' ;;
+		*)
+			invalid_entry ;;
+	esac
+}
+##
 #----Croc Pot Plus Menu
 ##
 	croc_title && tput cup 6 0
-	MenuTitle 'CROC_POT PLUS MENU'
+	MenuTitle 'CROC POT PLUS MENU'
 	MenuColor 20 1 'RECON SCAN MENU'
 	MenuColor 20 2 'CROC VPN SETUP'
 	MenuColor 20 3 'PASS TIME GAMES'
 	MenuColor 20 4 'INSTALL PAYLOADS'
 	MenuColor 20 5 'O.MG CABLE MENU'
 	MenuColor 20 6 'QUACK EXPLORE'
-	MenuColor 20 7 'RETURN TO MAIN MENU'
+	MenuColor 20 7 'CHAT GPT'
+	MenuColor 20 8 'RETURN TO MAIN MENU'
 	MenuEnd 19
 	case "$m_a" in
 		1) croc_recon ;;
@@ -7130,7 +7281,8 @@ esac
 		4) install_payloads_menu ;;
 		5) omg_cable ;;
 		6) insert_quack ;;
-		7) main_menu ;;
+		7) chat_openai ; croc_pot_plus ;;
+		8) main_menu ;;
 		0) exit ;;
 		[pP]) Panic_button ;;
 		kp | KP) start_icmp ; croc_pot_plus ;;
@@ -7750,7 +7902,7 @@ menu_A() {
 		9) nmon_system ; menu_A ;;
 		10) list_match ; menu_A ;;
 		11) check_weather ; menu_A ;;
-		12) top_croc ; tput civis ; menu_A ;;
+		12) top_croc ; menu_A ;;
 		13) cheat_sheet ; menu_A ;;
 		14) iptraf_ng ; menu_A ;;
 		15) main_menu ;;
@@ -7764,10 +7916,30 @@ menu_A
 #----Edit keycroc Files with nano or vim menu/Function
 ##
 function croc_edit_menu() {
+	tput civis
 	Info_Screen '-Edit keycroc files with nano or vim
 -Select ATTACKMODE MODE'
-	cd / ; for i in $(ls -d /* | wc -l);do ColorYellow "Directory count: $(ColorGreen "$i")\n"; done
-	cd / ; for i in $(ls -d) ;do g="$(find ./"$i" -type f -print | wc -l)" ; ColorYellow "File count: $(ColorGreen "$g")\n"; done 2>/dev/null
+##
+#----Count Files and Directories on keycroc
+##
+	if [ -f "$tmp_file" ]; then
+		ColorYellow "Number of Directories: $(ColorGreen "$count")\n"
+		ColorYellow "Total number of Files: $(ColorGreen "$total_files")\n"
+	else
+		count=0
+		total_files=0
+		tmp_file=$(mktemp)
+		for dir in /{,bin,boot,dev,etc,home,lib,lost+found,media,mnt,proc,root,run,sbin,srv,sys,tmp,usr,var,opt}/*; do
+			count=$((count + 1))
+			files=$(find "$dir" -type f 2>/dev/null | wc -l)
+			total_files=$((total_files + files))
+			echo "$count $total_files" > "$tmp_file"
+		done & displaySpinner 'Counting Files and Directories one moment please...'
+		count=$(awk '{print $1}' "$tmp_file")
+		total_files=$(awk '{print $2}' "$tmp_file")
+		ColorYellow "Number of Directories: $(ColorGreen "$count")\n"
+		ColorYellow "Total number of Files: $(ColorGreen "$total_files")\n"
+	fi
 ##
 #----Edit menu- Select editor to use in terminal
 ##
@@ -7794,15 +7966,18 @@ edit_all() {
 	else
 		invalid_entry
 	fi
-	tput civis
 	croc_edit_menu
 }
 ##
 #----Edit menu- remove file from keycroc
 ##
 remove_file() {
-	cd / ; for i in ls -d /*; do g="$(find ./"$i" -type f -print | wc -l)"
-	ColorYellow "Directory:$(ColorCyan " $i ")$(ColorYellow 'Contains:')$(ColorGreen " $g ")$(ColorYellow 'files.')\n"; done 2>/dev/null
+	for dir in {bin,boot,dev,etc,home,lib,lost+found,media,mnt,proc,root,run,sbin,srv,sys,tmp,usr,var,opt}; do
+		count=$(find "/$dir" -type f 2>/dev/null | wc -l)
+		if [ $? -eq 0 ]; then
+			ColorYellow "Directory:$(ColorCyan " /$dir ")$(ColorYellow 'Contains:')$(ColorGreen " $count ")$(ColorYellow 'files.')\n"
+		fi
+	done
 	read_all 'ENTER THE DIRECTORY NAME TO VIEW FILES AND PRESS [ENTER]' ; local f_n="$r_a"
 	f="$(find /"$f_n" -type f -name "*")" ; ColorRed "$f\n"
 	read_all 'ENTER THE FILE NAME TO BE REMOVE AND PRESS [ENTER]' ; local r_f="$r_a"
@@ -7823,15 +7998,18 @@ remove_file() {
 	else
 		invalid_entry
 	fi
-	tput civis
 	croc_edit_menu
 }
 ##
 #----Edit menu- search directory select file to Edit on keycroc
 ##
 user_edit() {
-	cd / ; for i in ls -d /*; do g="$(find ./"$i" -type f | wc -l)"
-	ColorYellow "Directory:$(ColorCyan " $i ")$(ColorYellow 'Contains:')$(ColorGreen " $g ")$(ColorYellow 'files.')\n"; done 2>/dev/null
+	for dir in {bin,boot,dev,etc,home,lib,lost+found,media,mnt,proc,root,run,sbin,srv,sys,tmp,usr,var,opt}; do
+		count=$(find "/$dir" -type f 2>/dev/null | wc -l)
+		if [ $? -eq 0 ]; then
+			ColorYellow "Directory:$(ColorCyan " /$dir ")$(ColorYellow 'Contains:')$(ColorGreen " $count ")$(ColorYellow 'files.')\n"
+		fi
+	done
 	read_all 'ENTER THE DIRECTORY NAME TO VIEW FILES AND PRESS [ENTER]' ; local r_f="$r_a"
 	f="$(find /"$r_f" -type f -name "*")" ; ColorGreen "$f\n"
 	read_all 'ENTER THE FILE NAME TO EDIT AND PRESS [ENTER]'
@@ -7840,7 +8018,6 @@ user_edit() {
 	else
 		invalid_entry
 	fi
-	tput civis
 	croc_edit_menu
 }
 ##
@@ -7894,10 +8071,10 @@ mc_remove() {
 ##
 	MenuTitle 'CROC EDIT MENU'
 	MenuColor 22 1 'CROC PAYLOADS FOLDER' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 22 8 'ATTACKMODE HID' | sed 's/\t//g'
-	MenuColor 22 2 'CROC TOOLS FOLDER' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 22 9 'RELOAD_PAYLOADS' | sed 's/\t//g'
+	MenuColor 22 2 'CROC TOOLS FOLDER' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 22 9 'RELOAD PAYLOADS' | sed 's/\t//g'
 	MenuColor 22 3 'CROC LOOT FOLDER' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 10 'ATTACKMODE OFF' | sed 's/\t//g'
-	MenuColor 22 4 'CROC CONFIG FILE' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 11 'ARMING_MODE' | sed 's/\t//g'
-	MenuColor 22 5 'CROC ENTER FILE NAME' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 12 'ATTACKMODE RO_STORGE' | sed 's/\t//g'
+	MenuColor 22 4 'CROC CONFIG FILE' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 11 'ARMING MODE' | sed 's/\t//g'
+	MenuColor 22 5 'CROC ENTER FILE NAME' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 12 'ATTACKMODE RO STORGE' | sed 's/\t//g'
 	MenuColor 22 6 'CROC REMOVE FILES' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 13 'ATTACKMODE ETHERNET' | sed 's/\t//g'
 	MenuColor 22 7 'ATTACKMODE STORAGE' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 21 14 'MIDNIGHT MANAGER' | sed 's/\t//g'
 	MenuColor 21 15 'RETURN TO MAIN MENU'
@@ -7906,7 +8083,7 @@ mc_remove() {
 		1) edit_all /root/udisk/payloads ;;
 		2) edit_all /root/udisk/tools ;;
 		3) edit_all /root/udisk/loot ;;
-		4) "$EDITOR" /root/udisk/config.txt ; tput civis ; croc_edit_menu ;;
+		4) "$EDITOR" /root/udisk/config.txt ; croc_edit_menu ;;
 		5) user_edit ;;
 		6) remove_file ;;
 		7) ATTACKMODE HID STORAGE ; croc_edit_menu ;;
@@ -7917,9 +8094,9 @@ mc_remove() {
 		12) ATTACKMODE RO_STORGE ; croc_edit_menu ;;
 		13) ATTACKMODE HID AUTO_ETHERNET ; croc_edit_menu ;;
 		14) midnight_manager ;;
-		15) main_menu ;;
+		15) main_menu ; tput civis ;;
 		0) exit ;;
-		[pP]) Panic_button ;; [bB]) main_menu ;; *) invalid_entry ; croc_edit_menu ;;
+		[pP]) Panic_button ;; [bB]) main_menu ; tput civis ;; *) invalid_entry ; croc_edit_menu ;;
 	esac
 }
 ##
@@ -9001,8 +9178,8 @@ command_menu
 	MenuTitle 'CROC POT SSH MENU'
 	MenuColor 18 1 'SSH TARGET PC' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 20 7 'LAN TURTLE' | sed 's/\t//g'
 	MenuColor 18 2 'SSH USER INPUT' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 20 8 'SIGNAL OWL' | sed 's/\t//g'
-	MenuColor 18 3 'ENABLE_SSH' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 20 9 'SHARK JACK' | sed 's/\t//g'
-	MenuColor 18 4 'DISABLE_SSH' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 19 10 'BASH BUNNY' | sed 's/\t//g'
+	MenuColor 18 3 'ENABLE SSH' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 20 9 'SHARK JACK' | sed 's/\t//g'
+	MenuColor 18 4 'DISABLE SSH' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 19 10 'BASH BUNNY' | sed 's/\t//g'
 	MenuColor 18 5 'WIFI PINEAPPLE MK7' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 19 11 'REVERSE SHELL MENU' | sed 's/\t//g'
 	MenuColor 18 6 'PACKET SQUIRREL' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 19 12 'PUBLIC/PRIVATE KEY' | sed 's/\t//g'
 	MenuColor 19 13 'RETURN TO MAIN MENU'
@@ -9286,6 +9463,7 @@ Q STRING \"Q STRING \\\"ssh -o 'StrictHostKeyChecking no' root@\\\$(ifconfig wla
 ##
 reset_wifi() {
 	Info_Screen 'Reset Wireless Networking'
+	SSID_CHECK
 	read_all 'RESET WIRELESS NETWORK Y/N AND PRESS [ENTER]'
 	case "$r_a" in
 		[yY] | [yY][eE][sS])
@@ -9565,7 +9743,7 @@ edit_ip() {
 ##
 function main_menu() {
 	croc_title && tput cup 6 0
-	MenuTitle 'CROC_POT MAIN MENU'
+	MenuTitle 'CROC POT MAIN MENU'
 	MenuColor 16 1 'CROC MAIL' "$clear$blue${array[4]}"
 	MenuColor 16 2 'CROC POT PLUS' "$clear$red${array[5]}"
 	MenuColor 16 3 'KEYCROC STATUS' "$clear$green${array[6]}"
