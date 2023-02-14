@@ -1,55 +1,40 @@
 # Croc_Pot
 ## INTRODUCTION :
-* This project is developed for the HAK5 KeyCroc 
-  - Keycroc is a powerful pentesting device use ethically and responsibly
-  - Thanks to everyone at HAK5 for this platform to work on
-  - (Croc_Pot under construction and testing)
+* This project is developed for the Hak5 KeyCroc, a powerful pentesting device that should be used ethically and responsibly. Thanks to everyone at Hak5 for this platform to work on. (Croc_Pot is currently under construction and testing.)
 
-* **Croc_Pot_Payload.txt**
-  - Will start OS detection scan to see what OS the keycroc is pluged into (usb), collect some data off the target pc, automatically start an SSH session with connected target pc (wifi) and start Croc_Pot script
-  - Ensure your keycroc is connected to the target pc wifi first before running **crocpot** If you do not have the target pc wifi credentials Croc_Pot has a payload to get you online (payload called getonline working on windows & Raspberry pi & linux)
+* **Croc_Pot_Payload.txt:**
+The project will start an OS detection scan to determine what OS the KeyCroc is plugged into (via USB), collect some data from the target PC, automatically start an SSH session with the connected target PC (via WiFi), and start the Croc_Pot script. Before running Croc_Pot, ensure that your KeyCroc is connected to the target PC's WiFi. If you do not have the target PC's WiFi credentials, Croc_Pot has a payload called "getonline" that will get you online (works on Windows, Raspberry Pi, and Linux).
 
-* **Croc_Pot.sh**
-  - This project is to automate some commands for the keycroc for quicker setup, install payloads, remotely connect to keycroc, nmap tcpdump target pc scan, edited files on your keycroc, send e-mail from your keycroc, SSH to hak5 gear, run hak5 cloud C2 on keycroc, status of your keycroc, and more 
+* **Croc_Pot.sh:**
+This project automates some commands for the KeyCroc for quicker setup, installation of payloads, remote connection to the KeyCroc, Nmap TCPdump target PC scan, edited files on your KeyCroc, sending emails from your KeyCroc, SSH to Hak5 gear, running Hak5 cloud C2 on the KeyCroc, checking the status of your KeyCroc, and more. 
 
-* **TESTED ON**
-  - Windows 10
-  - Raspberry pi 4
-  - linux parrot os
-  - Sorry no support for MAC OS
+* **TESTED ON:**
+  Windows 10, Raspberry Pi 4, Linux Parrot OS. Sorry, no support for macOS.
 
 ## INSTALLATION :
 
-* Two file to this script
-  - Will need to enter arming mode on your keycroc to install files.
-  - First file is called **Croc_Pot.sh** Place this in the KeyCroc **tools folder**.
-  - Second file is called **Croc_Pot_Payload.txt** Place this in the KeyCroc **payload folder**.
-  - Edited the Croc_Pot_Payload.txt file for your keycroc passwd. default is (hak5croc)
-  - Ensure your KeyCroc is connected (wifi) to the same local network as the target pc
+* There are two files for this script. You will need to enter arming mode on your KeyCroc to install the files. The first file is called Croc_Pot.sh and should be placed in the **KeyCroc tools folder**. The second file is called Croc_Pot_Payload.txt and should be placed in the **KeyCroc payload folder**. Edit the Croc_Pot_Payload.txt file for your KeyCroc password (default is "hak5croc"). Ensure your KeyCroc is connected to the same local network as the target PC via WiFi.
 
 ## STARTING CROC_POT :
 
-  - First way to start Croc_Pot.sh is ssh into your keycroc and type **/root/udisk/tools/Croc_Pot.sh**.
-  - Second way to start Croc_Pot.sh is type in anywhere **crocpot** this will start Croc_Pot.sh script automatically.
-  - It is recommended to start Croc_Pot.sh script with typing in **crocpot** as this payload will collect some data off the target pc. Some of the info that it will collect will be Target pc (ip address, current user name, pc host name, ssid and passwd, mac address), This info will be used in the Croc_Pot.sh script. 
-  - **NOTE:** When running **crocpot** scan takes about 30-40 sec to start because of OS detection then Croc_Pot will start.
-  - **TIPS:** When Starting Croc_Pot on new target pc
-    - 1: Run Getonline payload to connect the keycroc to the target pc wifi.
-    - 2: Run CrocUnlock payload to get the target pc passwd.
-    - 3: Then type in anywhere crocpot.
+  - The first way to start Croc_Pot.sh is to SSH into your KeyCroc and type **/root/udisk/tools/Croc_Pot.sh**. The second way to start Croc_Pot.sh is to type **"crocpot"** anywhere, which will automatically start the Croc_Pot.sh script. It is recommended to start the Croc_Pot.sh script by typing **"crocpot"** because this payload will collect some data from the target PC. Some of the information that it will collect includes the target PC's IP address, current user name, PC host name, SSID and password, and MAC address. This information will be used in the Croc_Pot.sh script. 
+  - **NOTE:** When running **Croc_Pot**, the scan takes about 30-40 seconds to start because of OS detection, and then Croc_Pot will start.
+  - **TIPS:** When Starting Croc_Pot on a new target pc
+    - 1: Run **"Croc_Getonline"** payload to connect the keycroc to the target PC's WiFi.
+    - 2: Run **"Croc_Unlock payload"** to get the target PC's password.
+    - 3: Then type **"crocpot"** anywhere.
 
 ## SSH MENU :
 
- * Automatically Accepts SSH Fingerprint with Command Line Options
-   - Croc_Pot in some of ssh options will automatically accept the SSH servers fingerprint and add it to the known hosts file we can pass the StrictHostKeyChecking no option to SSH. Example ssh -o "StrictHostKeyChecking no" HOST@IP
-   - **NOTE:** Automatically accepting the SSH fingerprint effectively bypasses the security put in place by SSH. You should be careful using this, especially on untrusted networks, including the public internet.
+ * Croc_Pot offers some SSH options that will automatically accept the SSH server's fingerprint and add it to the known hosts file. We can pass the StrictHostKeyChecking no option to SSH. For example, ssh -o "StrictHostKeyChecking no" HOST@IP.
+   - **NOTE:** Automatically accepting the SSH fingerprint bypasses the security put in place by SSH, so you should be careful when using this, especially on untrusted networks such as the public internet.
 
  * **SSH TO HAK5 GEAR**
- * Ensure all hak5 gear is connected to the same local network as your keycroc
-   - Recommended to setup ssh PUBLIC AND PRIVATE KEY to each of your hak5 gear, SSH to your gear Without Password
-   - SSH keycroc to Bash Bunny setup, first ensure your bash bunny has internet connection and connected to the same pc as your Keycroc, (bash bunny internet setup can be found at docs.hak5.org), Croc_Pot.sh will create a payload for your bash bunny, this file will be saved on your keycroc at tools/Croc_Pot/Bunny_Payload_Shell then copy this file to one of the payload switches on your bash bunny this is to start Reverse SSH Tunnel to keycroc.
+ * Ensure that all Hak5 gear is connected to the same local network as your Keycroc.
+   - It is recommended to set up a public and private key for each of your Hak5 gear to SSH without a password.
+   - To set up the SSH Keycroc to Bash Bunny connection, ensure that your Bash Bunny has an internet connection and is connected to the same PC as your Keycroc (Bash Bunny internet setup can be found at docs.hak5.org). Croc_Pot.sh will create a payload for your Bash Bunny, which will be saved on your Keycroc at tools/Croc_Pot/Bunny_Payload_Shell. Then copy this file to one of the payload switches on your Bash Bunny to start the reverse SSH tunnel to Keycroc.
 
-### CREATE PUBLIC AND PRIVATE KEY
+### To create a public and private key:
 * Perform SSH Login Without Password Using ssh-keygen & ssh-copy-id
 * Step 1: Create public and private keys using ssh-key-gen on local-host
   - jsmith@local-host$ **Note: You are on local-host here**
@@ -60,15 +45,15 @@
    - jsmith@remote-host's password:
  * Step 3: Login to remote-host without entering the password
    -jsmith@local-host$ **ssh username@remote-host-ip**
- * The above 3 simple steps should get the job done in most cases.
+ * The above three simple steps should get the job done in most cases.
  
- ### Setup Reverse SSH Tunnel
+ ### To set up a reverse SSH tunnel:
    - Reverse SSH is a technique that can be used to access systems (that are behind a firewall) from the outside world.
-   - Here is the command for remote server side
+   - Here is the command for remote server side:
    - **ssh -fN -R 7000:localhost:22 username@your-Machine-ipaddress**
-   - Now do an ssh connection request from your machine to your own machine at port 7000:
+   - Now, do an ssh connection request from your machine to your own machine at port 7000:
    - **ssh username@localhost -p 7000**
-   - Here, though it may seem like you are doing ssh on localhost but your request would be forwarded to remote host. So, you should use your account username on remote server and when prompted for password, enter the corresponding password.
+   - Although it may seem like you are doing SSH on localhost, your request will be forwarded to the remote host. So you should use your account username on the remote server and enter the corresponding password when prompted.
    
    **SCREENSHOT**
    
