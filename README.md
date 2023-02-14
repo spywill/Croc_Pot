@@ -3,7 +3,7 @@
 * This project is developed for the Hak5 KeyCroc, a powerful pentesting device that should be used ethically and responsibly. Thanks to everyone at Hak5 for this platform to work on. (Croc_Pot is currently under construction and testing.)
 
 * **Croc_Pot_Payload.txt:**
-The project will start an OS detection scan to determine what OS the KeyCroc is plugged into (via USB), collect some data from the target PC, automatically start an SSH session with the connected target PC (via WiFi), and start the Croc_Pot script. Before running Croc_Pot, ensure that your KeyCroc is connected to the target PC's WiFi. If you do not have the target PC's WiFi credentials, Croc_Pot has a payload called "getonline" that will get you online (works on Windows, Raspberry Pi, and Linux).
+The project will start an OS detection scan to determine what OS the KeyCroc is plugged into (via USB), collect some data from the target PC, automatically start an SSH session with the connected target PC (via WiFi), and start the Croc_Pot script. Before running Croc_Pot, ensure that your KeyCroc is connected to the target PC's WiFi. If you do not have the target PC's WiFi credentials, Croc_Pot has a payload called "Croc_getonline" that will get you online (works on Windows, Raspberry Pi, and Linux).
 
 * **Croc_Pot.sh:**
 This project automates some commands for the KeyCroc for quicker setup, installation of payloads, remote connection to the KeyCroc, Nmap TCPdump target PC scan, edited files on your KeyCroc, sending emails from your KeyCroc, SSH to Hak5 gear, running Hak5 cloud C2 on the KeyCroc, checking the status of your KeyCroc, and more. 
@@ -18,7 +18,7 @@ This project automates some commands for the KeyCroc for quicker setup, installa
 ## STARTING CROC_POT :
 
   - The first way to start Croc_Pot.sh is to SSH into your KeyCroc and type **/root/udisk/tools/Croc_Pot.sh**. The second way to start Croc_Pot.sh is to type **"crocpot"** anywhere, which will automatically start the Croc_Pot.sh script. It is recommended to start the Croc_Pot.sh script by typing **"crocpot"** because this payload will collect some data from the target PC. Some of the information that it will collect includes the target PC's IP address, current user name, PC host name, SSID and password, and MAC address. This information will be used in the Croc_Pot.sh script. 
-  - **NOTE:** When running **Croc_Pot**, the scan takes about 30-40 seconds to start because of OS detection, and then Croc_Pot will start.
+  - **NOTE:** When running **crocpot**, the scan takes about 30-40 seconds to start because of OS detection, and then Croc_Pot will start.
   - **TIPS:** When Starting Croc_Pot on a new target pc
     - 1: Run **"Croc_Getonline"** payload to connect the keycroc to the target PC's WiFi.
     - 2: Run **"Croc_Unlock payload"** to get the target PC's password.
