@@ -44,7 +44,7 @@ This project automates some commands for the KeyCroc for quicker setup, installa
    - jsmith@local-host$ **ssh-copy-id -i ~/.ssh/id_rsa.pub username@remote-host-ip**
    - jsmith@remote-host's password:
  * Step 3: Login to remote-host without entering the password
-   -jsmith@local-host$ **ssh username@remote-host-ip**
+   - jsmith@local-host$ **ssh username@remote-host-ip**
  * The above three simple steps should get the job done in most cases.
  
  ### To set up a reverse SSH tunnel:
