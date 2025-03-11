@@ -9,7 +9,7 @@ The project will start an OS detection scan to determine what OS the KeyCroc is 
 This project automates some commands for the KeyCroc for quicker setup, installation of payloads, remote connection to the KeyCroc, Nmap TCPdump target PC scan, edited files on your KeyCroc, sending emails from your KeyCroc, SSH to Hak5 gear, running Hak5 cloud C2 on the KeyCroc, checking the status of your KeyCroc, and more. 
 
 * **TESTED ON:**
-  Windows 10, Raspberry Pi 4, Linux Parrot OS. Sorry, no support for macOS.
+  Windows 10, Raspberry Pi 5 Bookworm, Linux Parrot OS. Sorry, no support for macOS.
 
 ## INSTALLATION :
 
